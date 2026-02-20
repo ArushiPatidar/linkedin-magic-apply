@@ -1,4 +1,1 @@
-"Hello,\n"
-"I am a Software developer with 2 years of experience in developing Scalable and Modular Systems.\n"
-"I will be a great fit for SDE role, and I am very much inclined towards joining your org.\n"
-"Resume https://bit.ly/Arushi_resume"
+Hello
