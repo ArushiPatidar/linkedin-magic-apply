@@ -11,11 +11,14 @@ from browser import driver, wait
 from config import CONNECTION_NOTE
 from utils import random_delay, dismiss_any_modal
 import time
+from datetime import datetime
 
 
-def send_connection_requests_on_page():
-    """Find all Connect buttons on the current page and click them."""
+def send_connection_requests_on_page(remaining=None, log_callback=None):
+    """Find all Connect buttons on the current page and click them.
+    Returns (sent_count, log_entries) where log_entries is a list of dicts."""
     sent = 0
+    log_entries = []
 
     connect_containers = driver.find_elements(
         By.CSS_SELECTOR, '[data-view-name="edge-creation-connect-action"]'
@@ -23,9 +26,13 @@ def send_connection_requests_on_page():
     print(f"  Found {len(connect_containers)} Connect button(s) on this page.")
 
     for idx in range(len(connect_containers)):
+        if remaining is not None and sent >= remaining:
+            print(f"  Reached per-company limit, stopping.")
+            break
+
         try:
             dismiss_any_modal()
-            random_delay(0.5, 1)
+            random_delay(0.3, 0.8)
 
             containers = driver.find_elements(
                 By.CSS_SELECTOR, '[data-view-name="edge-creation-connect-action"]'
@@ -55,7 +62,7 @@ def send_connection_requests_on_page():
                 except ElementClickInterceptedException:
                     print(f"    ⚠ Click intercepted (attempt {attempt + 1}/3), dismissing overlay …")
                     dismiss_any_modal()
-                    random_delay(1, 2)
+                    random_delay(0.5, 1)
                     try:
                         containers = driver.find_elements(
                             By.CSS_SELECTOR, '[data-view-name="edge-creation-connect-action"]'
@@ -75,42 +82,36 @@ def send_connection_requests_on_page():
                 continue
 
             modal_handled = False
+            note_sent = ""
+            method = ""
 
-            # Option A: Click "Add a note" button only
+            # Option A: Access modal via shadow DOM, click "Add a note", fill textarea, send
             try:
                 print("before add note")
-                # add 2 sec delay
+                driver.implicitly_wait(5)
 
-                add_note_button = wait.until(EC.element_to_be_clickable(
-                    (By.XPATH, "//span[text()='Add a note']"))
+                root_element = driver.find_element(By.XPATH, '//*[@id="root"]')
+                shadow_containers = root_element.find_elements(
+                    By.XPATH, './/div[@data-testid="interop-shadowdom"]'
                 )
 
-                # add_note_btn = wait.until(EC.element_to_be_clickable(
-                #     (By.XPATH, "//button")
-                # ))
+                if not shadow_containers:
+                    raise NoSuchElementException("No shadow DOM container found")
 
-                # add_note_btn = driver.find_element(
-                #     By.CSS_SELECTOR,
-                #     'button'
-                #     # 'button[aria-label="Add a note"]'
-                # )
+                shadow_root = shadow_containers[0].shadow_root
 
-                print("--x--")
-                print("after add note ",add_note_btn)
-                print("--y--", add_note_btn.get_attribute("outerHTML"))
+                add_note_btn = shadow_root.find_element(
+                    By.CSS_SELECTOR, "button[aria-label='Add a note']"
+                )
+                print(f"    Found 'Add a note' button")
+                add_note_btn.click()
                 random_delay(0.5, 1)
-                try:
-                    print("before add note click", add_note_btn.text)
-                    add_note_btn.click()
-                    print("after add note click")
-                except ElementClickInterceptedException:
-                    driver.execute_script("arguments[0].click();", add_note_btn)
-                random_delay(1, 2)
 
-                note_textarea = wait.until(
-                    EC.presence_of_element_located(
-                        (By.CSS_SELECTOR, 'textarea[name="message"], textarea#custom-message')
-                    )
+                textarea = shadow_root.find_element(
+                    By.CSS_SELECTOR, "textarea[name='message']"
+                )
+                WebDriverWait(shadow_root, 10).until(
+                    EC.element_to_be_clickable((By.CSS_SELECTOR, "textarea[name='message']"))
                 )
 
                 first_name = (
@@ -123,75 +124,79 @@ def send_connection_requests_on_page():
                     if first_name
                     else CONNECTION_NOTE
                 )
-                note_textarea.clear()
-                note_textarea.send_keys(personal_note)
-                random_delay(1, 2)
+                textarea.clear()
+                textarea.send_keys(personal_note)
+                random_delay(0.5, 1)
 
-                send_btn = wait.until(
-                    EC.element_to_be_clickable(
-                        (By.CSS_SELECTOR,
-                         'button[aria-label="Send invitation"], '
-                         'button[aria-label="Send now"]')
-                    )
+                send_btn = shadow_root.find_element(
+                    By.CSS_SELECTOR, "button[aria-label='Send invitation']"
                 )
                 send_btn.click()
                 modal_handled = True
+                note_sent = personal_note
+                method = "with note"
                 print(f"    ✓ Sent (with note)")
-            except (TimeoutException, NoSuchElementException) as note_err:
-                print(f"    ⚠ Add-a-note path failed: {type(note_err).__name__}")
-                print("")
-                print("--z-- ", note_err)
+            except (TimeoutException, NoSuchElementException, StaleElementReferenceException) as note_err:
+                print(f"    ⚠ Add-a-note path failed: {type(note_err).__name__}: {note_err}")
 
-            # Option B: "Send without a note" button
+            # Option B: "Send without a note" via shadow DOM
             if not modal_handled:
                 try:
-                    send_btn = driver.find_element(
-                        By.CSS_SELECTOR,
-                        'button[aria-label="Send without a note"]',
+                    root_element = driver.find_element(By.XPATH, '//*[@id="root"]')
+                    shadow_containers = root_element.find_elements(
+                        By.XPATH, './/div[@data-testid="interop-shadowdom"]'
                     )
-                    if send_btn.is_displayed():
+                    if shadow_containers:
+                        shadow_root = shadow_containers[0].shadow_root
+                        send_btn = shadow_root.find_element(
+                            By.CSS_SELECTOR, "button[aria-label='Send without a note']"
+                        )
                         send_btn.click()
                         modal_handled = True
+                        method = "without note"
                         print(f"    ✓ Sent (without note)")
                 except (NoSuchElementException, TimeoutException):
                     pass
 
-            # Option C: Plain "Send" / "Send invitation" button inside a modal
+            # Option C: Plain "Send" / "Send invitation" via shadow DOM
             if not modal_handled:
                 try:
-                    send_btn = driver.find_element(
-                        By.XPATH,
-                        '//button[contains(@aria-label,"Send invitation") or '
-                        'contains(@aria-label,"Send now")]',
+                    root_element = driver.find_element(By.XPATH, '//*[@id="root"]')
+                    shadow_containers = root_element.find_elements(
+                        By.XPATH, './/div[@data-testid="interop-shadowdom"]'
                     )
-                    if send_btn.is_displayed():
+                    if shadow_containers:
+                        shadow_root = shadow_containers[0].shadow_root
+                        send_btn = shadow_root.find_element(
+                            By.CSS_SELECTOR,
+                            "button[aria-label='Send invitation'], button[aria-label='Send now']"
+                        )
                         send_btn.click()
                         modal_handled = True
+                        method = "direct invitation"
                         print(f"    ✓ Sent (invitation)")
-                except NoSuchElementException:
-                    pass
-
-            # Option D: Any primary button with text "Send"
-            if not modal_handled:
-                try:
-                    buttons = driver.find_elements(
-                        By.CSS_SELECTOR, "button.artdeco-button--primary"
-                    )
-                    for btn in buttons:
-                        if btn.text.strip().lower() in ("send", "send invitation"):
-                            btn.click()
-                            modal_handled = True
-                            print(f"    ✓ Sent (primary button)")
-                            break
-                except Exception:
+                except (NoSuchElementException, TimeoutException):
                     pass
 
             if not modal_handled:
                 print(f"    ⚠ No modal detected – request may have been sent directly.")
+                method = "unknown/direct"
 
-            random_delay(1, 2)
+            random_delay(0.5, 1)
             dismiss_any_modal()
             sent += 1
+
+            entry = {
+                "person_name": person_name,
+                "method": method,
+                "note": note_sent,
+                "status": "sent" if modal_handled else "possibly sent",
+                "timestamp": datetime.now().isoformat(),
+                "page_url": driver.current_url,
+            }
+            log_entries.append(entry)
+            if log_callback:
+                log_callback(entry)
 
         except (
             StaleElementReferenceException,
@@ -201,10 +206,10 @@ def send_connection_requests_on_page():
         ) as e:
             print(f"    ✗ Skipped ({type(e).__name__})")
             dismiss_any_modal()
-            random_delay(1, 2)
+            random_delay(0.5, 1)
             continue
 
-    return sent
+    return sent, log_entries
 
 
 def go_to_next_page():
@@ -219,7 +224,7 @@ def go_to_next_page():
             )
             random_delay(0.5, 1)
             next_btn.click()
-            random_delay(3, 5)
+            random_delay(0.5, 1)
             return True
     except NoSuchElementException:
         pass

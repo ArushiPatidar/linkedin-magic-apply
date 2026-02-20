@@ -1,6 +1,3 @@
-Rakuten
-Adobe
-Amazon
 Intuit
 Paypal
 Docusign

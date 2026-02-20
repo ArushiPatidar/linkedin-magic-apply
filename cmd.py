@@ -14,7 +14,7 @@ driver.maximize_window()
 driver.get("https://www.linkedin.com/login")
     
 driver.find_element(By.ID, "username").send_keys("mail.govind.c@gmail.com")
-driver.find_element(By.ID, "password").send_keys("****")
+driver.find_element(By.ID, "password").send_keys("linkedin!dnivog12")
 driver.find_element(By.XPATH, "//button[@type='submit']").click()
     
 # Wait for the feed to load after login
@@ -36,7 +36,7 @@ connect_containers = WebDriverWait(driver, 15).until(
 )
 print(f"  Found {len(connect_containers)} Connect button(s) on this page.")
 
-idx = 1
+idx = 2
 container = connect_containers[idx]
 connect_btn = WebDriverWait(container, 10).until(
     EC.element_to_be_clickable((By.CSS_SELECTOR, "a"))
@@ -45,13 +45,6 @@ person_name = connect_btn.get_attribute("aria-label") or "Unknown"
 connect_btn.click()
 
 driver.implicitly_wait(5)
-
-try:
-    WebDriverWait(driver, 5).until(
-        EC.presence_of_element_located((By.CSS_SELECTOR, '[data-view-name="edge-cresagarjaination-connect-action555"]'))
-    )
-except Exception as e:
-    print("Error waiting for modal:", e)
 
 root_element = driver.find_element(By.XPATH, '//*[@id="root"]')
 print("root element",root_element)

@@ -11,10 +11,10 @@ from browser import driver
 from config import DELAY_BETWEEN_ACTIONS
 
 
-def random_delay(low=None, high=None):
-    low = low or DELAY_BETWEEN_ACTIONS[0]
-    high = high or DELAY_BETWEEN_ACTIONS[1]
-    time.sleep(random.uniform(low, high))
+def random_delay(min_sec=0.5, max_sec=1.5):
+    """Sleep for a random duration between min_sec and max_sec."""
+    import time, random
+    time.sleep(random.uniform(min_sec, max_sec))
 
 
 def dismiss_any_modal():
