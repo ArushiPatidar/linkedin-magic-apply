@@ -430,10 +430,68 @@ def send_connection_requests_on_page(remaining=None, max_req_to_people=10, log_c
     )
     print(f"  Found {len(connect_containers)} Connect button(s) on this page.")
 
-    # --- Process Connect buttons (existing logic) ---
+    # --- Process Follow buttons FIRST (open profile in new tab → More → Connect) ---
+    # Collect Follow person info before iterating (to avoid stale references)
+    follow_people = []
+    try:
+        follow_containers = driver.find_elements(
+            By.CSS_SELECTOR, '[data-view-name="edge-creation-follow-action"]'
+        )
+        for fc in follow_containers:
+            try:
+                # Navigate up to the parent <a> that wraps the whole search result card
+                parent_link = fc.find_element(By.XPATH, './ancestor::a[@href]')
+                profile_url = parent_link.get_attribute("href")
+                # Try to get person name from aria-label of Follow button or link text
+                try:
+                    follow_btn = fc.find_element(By.CSS_SELECTOR, "button")
+                    aria = follow_btn.get_attribute("aria-label") or ""
+                    person_name = aria.replace("Follow ", "").strip() if aria.startswith("Follow") else aria
+                except Exception:
+                    person_name = "Unknown"
+                if profile_url and "/in/" in profile_url:
+                    follow_people.append((profile_url, person_name))
+            except Exception:
+                continue
+    except Exception:
+        pass
+
+    print(f"  Collected {len(follow_people)} Follow person profile(s) to process.")
+
+    for profile_url, person_name in follow_people:
+        if remaining is not None and sent >= remaining:
+            print(f"  Reached per-company limit, stopping.")
+            break
+        if sent >= max_req_to_people:
+            print(f"  Reached max requests per page, stopping.")
+            break
+
+        print(f"  → Follow person: {person_name} ({profile_url})")
+        success, modal_handled, note_sent, method = _handle_follow_person(profile_url, person_name)
+
+        if success:
+            sent += 1
+            entry = {
+                "person_name": person_name,
+                "method": f"follow→profile: {method}",
+                "note": note_sent,
+                "status": "sent" if modal_handled else "possibly sent",
+                "timestamp": datetime.now().isoformat(),
+                "page_url": profile_url,
+            }
+            log_entries.append(entry)
+            if log_callback:
+                log_callback(entry)
+        else:
+            print(f"    ✗ Could not send connection to {person_name}")
+
+    # --- Process Connect buttons SECOND ---
     for idx in range(min(len(connect_containers), max_req_to_people)):
         if remaining is not None and sent >= remaining:
             print(f"  Reached per-company limit, stopping.")
+            break
+        if sent >= max_req_to_people:
+            print(f"  Reached max requests per page, stopping.")
             break
 
         try:
@@ -513,61 +571,6 @@ def send_connection_requests_on_page(remaining=None, max_req_to_people=10, log_c
             dismiss_any_modal()
             random_delay(0.5, 1)
             continue
-
-    # --- Process Follow buttons (new: open profile in new tab → More → Connect) ---
-    # Collect Follow person info before iterating (to avoid stale references)
-    follow_people = []
-    try:
-        follow_containers = driver.find_elements(
-            By.CSS_SELECTOR, '[data-view-name="edge-creation-follow-action"]'
-        )
-        for fc in follow_containers:
-            try:
-                # Navigate up to the parent <a> that wraps the whole search result card
-                parent_link = fc.find_element(By.XPATH, './ancestor::a[@href]')
-                profile_url = parent_link.get_attribute("href")
-                # Try to get person name from aria-label of Follow button or link text
-                try:
-                    follow_btn = fc.find_element(By.CSS_SELECTOR, "button")
-                    aria = follow_btn.get_attribute("aria-label") or ""
-                    person_name = aria.replace("Follow ", "").strip() if aria.startswith("Follow") else aria
-                except Exception:
-                    person_name = "Unknown"
-                if profile_url and "/in/" in profile_url:
-                    follow_people.append((profile_url, person_name))
-            except Exception:
-                continue
-    except Exception:
-        pass
-
-    print(f"  Collected {len(follow_people)} Follow person profile(s) to process.")
-
-    for profile_url, person_name in follow_people:
-        if remaining is not None and sent >= remaining:
-            print(f"  Reached per-company limit, stopping.")
-            break
-        if sent >= max_req_to_people:
-            print(f"  Reached max requests per page, stopping.")
-            break
-
-        print(f"  → Follow person: {person_name} ({profile_url})")
-        success, modal_handled, note_sent, method = _handle_follow_person(profile_url, person_name)
-
-        if success:
-            sent += 1
-            entry = {
-                "person_name": person_name,
-                "method": f"follow→profile: {method}",
-                "note": note_sent,
-                "status": "sent" if modal_handled else "possibly sent",
-                "timestamp": datetime.now().isoformat(),
-                "page_url": profile_url,
-            }
-            log_entries.append(entry)
-            if log_callback:
-                log_callback(entry)
-        else:
-            print(f"    ✗ Could not send connection to {person_name}")
 
     return sent, log_entries
 

@@ -1,3 +1,5 @@
+Flipkart,11
+Oracle,12
 Uber,7
 PhonePe, 8
 Swiggy,1
