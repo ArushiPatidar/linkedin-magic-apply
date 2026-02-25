@@ -1,3 +1,8 @@
+Swiggy
 Intuit
-Paypal
-Docusign
+Microsoft
+Cisco
+Honeywell
+Qualcomm
+Amazon
+Groww

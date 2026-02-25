@@ -2,3 +2,4 @@ credential.json
 log*
 log/
 *.csv
+__pycache__/
