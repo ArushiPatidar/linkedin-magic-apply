@@ -53,11 +53,11 @@ def send_connection_requests_on_page(remaining=None, max_req_to_people=10, log_c
             # Retry click up to 3 times if intercepted
             click_success = False
             for attempt in range(3):
-                print("attempt", attempt)
+                print("attempt : ", attempt)
                 try:
                     connect_btn.click()
                     click_success = True
-                    print("attempt try : ", attempt)
+                    # print("attempt try : ", attempt)
                     break
                 except ElementClickInterceptedException:
                     print(f"    ⚠ Click intercepted (attempt {attempt + 1}/3), dismissing overlay …")
@@ -87,7 +87,6 @@ def send_connection_requests_on_page(remaining=None, max_req_to_people=10, log_c
 
             # Option A: Access modal via shadow DOM, click "Add a note", fill textarea, send
             try:
-                print("before add note")
                 driver.implicitly_wait(1)
 
                 root_element = driver.find_element(By.XPATH, '//*[@id="root"]')
