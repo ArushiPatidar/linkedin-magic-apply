@@ -14,18 +14,424 @@ import time
 from datetime import datetime
 
 
+def _send_note_via_shadow_dom(person_name):
+    """Shared logic: handle the connection modal (add note / send without note / send invitation).
+    Returns (modal_handled, note_sent, method)."""
+    modal_handled = False
+    note_sent = ""
+    method = ""
+
+    first_name = (
+        person_name.replace("Invite ", "").split(" to connect")[0].split()[0]
+        if "Invite" in person_name
+        else person_name.split()[0] if person_name and person_name != "Unknown" else ""
+    )
+    personal_note = (
+        CONNECTION_NOTE.replace("{name}", first_name)
+        if first_name
+        else CONNECTION_NOTE
+    )
+
+    # ── Path 1: Shadow DOM modal (search results page) ──
+
+    # Option A: Add a note
+    try:
+        driver.implicitly_wait(1)
+        root_element = driver.find_element(By.XPATH, '//*[@id="root"]')
+        shadow_containers = root_element.find_elements(
+            By.XPATH, './/div[@data-testid="interop-shadowdom"]'
+        )
+        if not shadow_containers:
+            raise NoSuchElementException("No shadow DOM container found")
+
+        shadow_root = shadow_containers[0].shadow_root
+        add_note_btn = shadow_root.find_element(
+            By.CSS_SELECTOR, "button[aria-label='Add a note']"
+        )
+        print(f"    Found 'Add a note' button (shadow DOM)")
+        add_note_btn.click()
+        random_delay(0.5, 1)
+
+        textarea = shadow_root.find_element(
+            By.CSS_SELECTOR, "textarea[name='message']"
+        )
+        WebDriverWait(shadow_root, 10).until(
+            EC.element_to_be_clickable((By.CSS_SELECTOR, "textarea[name='message']"))
+        )
+        textarea.clear()
+        textarea.send_keys(personal_note)
+        random_delay(0.5, 1)
+
+        send_btn = shadow_root.find_element(
+            By.CSS_SELECTOR, "button[aria-label='Send invitation']"
+        )
+        send_btn.click()
+        modal_handled = True
+        note_sent = personal_note
+        method = "with note"
+        print(f"    ✓ Sent (with note, shadow DOM)")
+    except (TimeoutException, NoSuchElementException, StaleElementReferenceException) as note_err:
+        print(f"    ⚠ Shadow DOM add-a-note path failed: {type(note_err).__name__}: {note_err}")
+
+    # Option B: Send without a note (shadow DOM)
+    if not modal_handled:
+        try:
+            root_element = driver.find_element(By.XPATH, '//*[@id="root"]')
+            shadow_containers = root_element.find_elements(
+                By.XPATH, './/div[@data-testid="interop-shadowdom"]'
+            )
+            if shadow_containers:
+                shadow_root = shadow_containers[0].shadow_root
+                send_btn = shadow_root.find_element(
+                    By.CSS_SELECTOR, "button[aria-label='Send without a note']"
+                )
+                send_btn.click()
+                modal_handled = True
+                method = "without note"
+                print(f"    ✓ Sent (without note, shadow DOM)")
+        except (NoSuchElementException, TimeoutException):
+            pass
+
+    # Option C: Plain Send / Send invitation (shadow DOM)
+    if not modal_handled:
+        try:
+            root_element = driver.find_element(By.XPATH, '//*[@id="root"]')
+            shadow_containers = root_element.find_elements(
+                By.XPATH, './/div[@data-testid="interop-shadowdom"]'
+            )
+            if shadow_containers:
+                shadow_root = shadow_containers[0].shadow_root
+                send_btn = shadow_root.find_element(
+                    By.CSS_SELECTOR,
+                    "button[aria-label='Send invitation'], button[aria-label='Send now']"
+                )
+                send_btn.click()
+                modal_handled = True
+                method = "direct invitation"
+                print(f"    ✓ Sent (invitation, shadow DOM)")
+        except (NoSuchElementException, TimeoutException):
+            pass
+
+    # ── Path 2: Regular DOM / artdeco modal (profile page) ──
+
+    # Option D: Add a note (regular DOM)
+    if not modal_handled:
+        try:
+            print(f"    Trying regular DOM modal path...")
+            # Look for "Add a note" button in artdeco modal
+            add_note_btn = WebDriverWait(driver, 5).until(
+                EC.element_to_be_clickable((
+                    By.XPATH,
+                    '//button[@aria-label="Add a note"] | '
+                    '//button[contains(@class,"artdeco-button")][.//span[text()="Add a note"]]'
+                ))
+            )
+            print(f"    Found 'Add a note' button (regular DOM)")
+            add_note_btn.click()
+            random_delay(0.5, 1)
+
+            # Find textarea in the modal
+            textarea = WebDriverWait(driver, 5).until(
+                EC.element_to_be_clickable((
+                    By.XPATH,
+                    '//textarea[@name="message"] | '
+                    '//textarea[contains(@id,"custom-message")]'
+                ))
+            )
+            textarea.clear()
+            textarea.send_keys(personal_note)
+            random_delay(0.5, 1)
+
+            # Click send
+            send_btn = WebDriverWait(driver, 5).until(
+                EC.element_to_be_clickable((
+                    By.XPATH,
+                    '//button[@aria-label="Send invitation"] | '
+                    '//button[@aria-label="Send now"] | '
+                    '//button[contains(@class,"artdeco-button--primary")][.//span[text()="Send"]]'
+                ))
+            )
+            send_btn.click()
+            modal_handled = True
+            note_sent = personal_note
+            method = "with note (regular DOM)"
+            print(f"    ✓ Sent (with note, regular DOM)")
+        except (TimeoutException, NoSuchElementException, StaleElementReferenceException) as e:
+            print(f"    ⚠ Regular DOM add-a-note path failed: {type(e).__name__}: {e}")
+
+    # Option E: Send without a note (regular DOM)
+    if not modal_handled:
+        try:
+            send_btn = driver.find_element(
+                By.XPATH,
+                '//button[@aria-label="Send without a note"] | '
+                '//button[@aria-label="Send now"] | '
+                '//button[contains(@class,"artdeco-button--primary")][.//span[text()="Send without a note"]]'
+            )
+            send_btn.click()
+            modal_handled = True
+            method = "without note (regular DOM)"
+            print(f"    ✓ Sent (without note, regular DOM)")
+        except (NoSuchElementException, TimeoutException):
+            pass
+
+    # Option F: Generic Send button (regular DOM)
+    if not modal_handled:
+        try:
+            send_btn = driver.find_element(
+                By.XPATH,
+                '//div[contains(@class,"artdeco-modal")]//button[contains(@class,"artdeco-button--primary")]'
+            )
+            send_btn.click()
+            modal_handled = True
+            method = "direct send (regular DOM)"
+            print(f"    ✓ Sent (direct, regular DOM)")
+        except (NoSuchElementException, TimeoutException):
+            pass
+
+    if not modal_handled:
+        print(f"    ⚠ No modal detected – request may have been sent directly.")
+        method = "unknown/direct"
+
+    return modal_handled, note_sent, method
+
+
+def _handle_follow_person(profile_url, person_name):
+    """Open a Follow person's profile in a new tab, click More → Connect, send note, close tab.
+    Returns (success, modal_handled, note_sent, method)."""
+    original_window = driver.current_window_handle
+
+    try:
+        # Open profile in new tab
+        driver.execute_script("window.open(arguments[0], '_blank');", profile_url)
+        random_delay(1, 2)
+
+        # Switch to the new tab (last handle)
+        new_tab = [h for h in driver.window_handles if h != original_window][-1]
+        driver.switch_to.window(new_tab)
+        random_delay(2, 3)
+
+        # Wait for profile page to load
+        WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.TAG_NAME, "body"))
+        )
+
+        dismiss_any_modal()
+        random_delay(0.5, 1)
+
+        # Close/minimize any expanded messaging overlay that may intercept clicks
+        try:
+            # Close all open message conversation windows
+            msg_close_btns = driver.find_elements(
+                By.CSS_SELECTOR,
+                'button[data-control-name="overlay.close_conversation_window"], '
+                'header.msg-overlay-bubble-header button.msg-overlay-bubble-header__control--new-convo-btn, '
+                'button.msg-overlay-bubble-header__button--minimize, '
+                'button[aria-label*="Close your"], '
+                'button[aria-label*="Minimize"]'
+            )
+            for btn in msg_close_btns:
+                try:
+                    btn.click()
+                    random_delay(0.3, 0.5)
+                except Exception:
+                    pass
+
+            # Minimize the main messaging dock/widget if expanded
+            msg_overlay = driver.find_elements(
+                By.CSS_SELECTOR,
+                'aside.msg-overlay-list-bubble--is-open button.msg-overlay-bubble-header__button, '
+                'div.msg-overlay-list-bubble button.msg-overlay-bubble-header__button'
+            )
+            for btn in msg_overlay:
+                try:
+                    btn.click()
+                    random_delay(0.3, 0.5)
+                except Exception:
+                    pass
+
+            # Last resort: hide the entire messaging sidebar via JS
+            driver.execute_script("""
+                var msgOverlay = document.querySelector('aside.msg-overlay-list-bubble, div.msg-overlay-list-bubble');
+                if (msgOverlay) { msgOverlay.style.display = 'none'; }
+                var msgConvos = document.querySelectorAll('div.msg-convo-wrapper, div.msg-overlay-conversation-bubble');
+                msgConvos.forEach(function(el) { el.style.display = 'none'; });
+            """)
+            random_delay(0.3, 0.5)
+        except Exception:
+            pass
+
+        print(f"    ✓ Messaging overlay collapsed/hidden. Now looking for 'More' button...")
+
+        # Scroll to top of profile actions area to ensure "More" button is in view
+        try:
+            driver.execute_script("window.scrollTo(0, 0);")
+            random_delay(1, 1.5)
+        except Exception:
+            pass
+
+        # Click "More" button on the profile — try multiple strategies
+        more_btn = None
+
+        # Strategy 1: ID ending in -profile-overflow-action
+        try:
+            more_btn = WebDriverWait(driver, 5).until(
+                EC.element_to_be_clickable((
+                    By.CSS_SELECTOR,
+                    'button[id$="-profile-overflow-action"]'
+                ))
+            )
+            print(f"    Found 'More' button via id selector")
+        except TimeoutException:
+            print(f"    ⚠ Strategy 1 (id selector) failed")
+
+        # Strategy 2: aria-label="More actions"
+        if not more_btn:
+            try:
+                more_btn = driver.find_element(
+                    By.CSS_SELECTOR,
+                    'button[aria-label="More actions"]'
+                )
+                print(f"    Found 'More' button via aria-label selector")
+            except NoSuchElementException:
+                print(f"    ⚠ Strategy 2 (aria-label) failed")
+
+        # Strategy 3: artdeco-dropdown trigger containing span "More"
+        if not more_btn:
+            try:
+                more_btn = driver.find_element(
+                    By.XPATH,
+                    '//div[contains(@class,"artdeco-dropdown")]//button[contains(@class,"artdeco-dropdown__trigger")]/span[text()="More"]/parent::button'
+                )
+                print(f"    Found 'More' button via XPath span text")
+            except NoSuchElementException:
+                print(f"    ⚠ Strategy 3 (XPath span text) failed")
+
+        # Strategy 4: find all buttons, look for one with child span "More" near the profile actions
+        if not more_btn:
+            try:
+                buttons = driver.find_elements(By.TAG_NAME, "button")
+                for btn in buttons:
+                    try:
+                        spans = btn.find_elements(By.TAG_NAME, "span")
+                        for span in spans:
+                            if span.text.strip() == "More":
+                                # Verify it's the profile actions "More", not something else
+                                btn_class = btn.get_attribute("class") or ""
+                                if "artdeco-dropdown__trigger" in btn_class:
+                                    more_btn = btn
+                                    print(f"    Found 'More' button via button scan (class: {btn_class[:60]})")
+                                    break
+                        if more_btn:
+                            break
+                    except StaleElementReferenceException:
+                        continue
+            except Exception:
+                print(f"    ⚠ Strategy 4 (button scan) failed")
+
+        if not more_btn:
+            print(f"    ✗ Could not find 'More' button on profile for {person_name} after all strategies")
+            driver.close()
+            driver.switch_to.window(original_window)
+            return False, False, "", ""
+
+        print(f"    Scrolling to 'More' button and clicking...")
+        driver.execute_script("arguments[0].scrollIntoView({block:'center'});", more_btn)
+        random_delay(0.5, 1)
+
+        # Attempt JS click, with retry using regular click as fallback
+        try:
+            driver.execute_script("arguments[0].click();", more_btn)
+            print(f"    ✓ 'More' button JS-clicked")
+        except Exception as e1:
+            print(f"    ⚠ JS click failed: {e1}, trying regular click...")
+            try:
+                more_btn.click()
+                print(f"    ✓ 'More' button regular-clicked")
+            except Exception as e2:
+                print(f"    ✗ Regular click also failed: {e2}")
+                driver.close()
+                driver.switch_to.window(original_window)
+                return False, False, "", ""
+
+        random_delay(1, 1.5)
+        print(f"    Dropdown should be open. Looking for 'Connect' option...")
+
+        # Click "Connect" from the dropdown — it's a div[role="button"] with aria-label containing "Invite" and "to connect"
+        connect_option = None
+        try:
+            connect_option = WebDriverWait(driver, 5).until(
+                EC.element_to_be_clickable((
+                    By.CSS_SELECTOR,
+                    'div.artdeco-dropdown__item[aria-label*="to connect"]'
+                ))
+            )
+        except TimeoutException:
+            # Fallback: look for the dropdown item by aria-label containing "connect"
+            try:
+                items = driver.find_elements(
+                    By.CSS_SELECTOR, 'div.artdeco-dropdown__item[role="button"]'
+                )
+                for item in items:
+                    aria = item.get_attribute("aria-label") or ""
+                    if "connect" in aria.lower():
+                        connect_option = item
+                        break
+            except Exception:
+                pass
+
+        if not connect_option:
+            print(f"    ✗ Could not find 'Connect' in More dropdown for {person_name}")
+            driver.close()
+            driver.switch_to.window(original_window)
+            return False, False, "", ""
+
+        connect_option.click()
+        random_delay(1, 1.5)
+
+        # Now use the shared note-sending logic
+        modal_handled, note_sent, method = _send_note_via_shadow_dom(person_name)
+        random_delay(0.5, 1)
+        dismiss_any_modal()
+
+        # Close the tab and switch back
+        driver.close()
+        driver.switch_to.window(original_window)
+        random_delay(0.5, 1)
+
+        return True, modal_handled, note_sent, method
+
+    except Exception as e:
+        print(f"    ✗ Error handling Follow person {person_name}: {type(e).__name__}: {e}")
+        # Make sure we close the tab and go back
+        try:
+            if driver.current_window_handle != original_window:
+                driver.close()
+            driver.switch_to.window(original_window)
+        except Exception:
+            driver.switch_to.window(original_window)
+        return False, False, "", ""
+
+
 def send_connection_requests_on_page(remaining=None, max_req_to_people=10, log_callback=None):
     """Find all Connect buttons on the current page and click them.
+    Also handle Follow buttons by opening profiles in new tabs.
     Returns (sent_count, log_entries) where log_entries is a list of dicts."""
     sent = 0
     log_entries = []
+
+    follow_containers = driver.find_elements(
+        By.CSS_SELECTOR, '[data-view-name="edge-creation-follow-action"]'
+    )
+    print(f"  Found {len(follow_containers)} Follow button(s) on this page.")
 
     connect_containers = driver.find_elements(
         By.CSS_SELECTOR, '[data-view-name="edge-creation-connect-action"]'
     )
     print(f"  Found {len(connect_containers)} Connect button(s) on this page.")
 
-    for idx in range(min(len(connect_containers),max_req_to_people)):
+    # --- Process Connect buttons (existing logic) ---
+    for idx in range(min(len(connect_containers), max_req_to_people)):
         if remaining is not None and sent >= remaining:
             print(f"  Reached per-company limit, stopping.")
             break
@@ -57,7 +463,6 @@ def send_connection_requests_on_page(remaining=None, max_req_to_people=10, log_c
                 try:
                     connect_btn.click()
                     click_success = True
-                    # print("attempt try : ", attempt)
                     break
                 except ElementClickInterceptedException:
                     print(f"    ⚠ Click intercepted (attempt {attempt + 1}/3), dismissing overlay …")
@@ -81,106 +486,7 @@ def send_connection_requests_on_page(remaining=None, max_req_to_people=10, log_c
                 print(f"    ✗ Skipped (could not click after retries)")
                 continue
 
-            modal_handled = False
-            note_sent = ""
-            method = ""
-
-            # Option A: Access modal via shadow DOM, click "Add a note", fill textarea, send
-            try:
-                driver.implicitly_wait(1)
-
-                root_element = driver.find_element(By.XPATH, '//*[@id="root"]')
-                shadow_containers = root_element.find_elements(
-                    By.XPATH, './/div[@data-testid="interop-shadowdom"]'
-                )
-
-                if not shadow_containers:
-                    raise NoSuchElementException("No shadow DOM container found")
-
-                shadow_root = shadow_containers[0].shadow_root
-
-                add_note_btn = shadow_root.find_element(
-                    By.CSS_SELECTOR, "button[aria-label='Add a note']"
-                )
-                print(f"    Found 'Add a note' button")
-                add_note_btn.click()
-                random_delay(0.5, 1)
-
-                textarea = shadow_root.find_element(
-                    By.CSS_SELECTOR, "textarea[name='message']"
-                )
-                WebDriverWait(shadow_root, 10).until(
-                    EC.element_to_be_clickable((By.CSS_SELECTOR, "textarea[name='message']"))
-                )
-
-                first_name = (
-                    person_name.replace("Invite ", "").split(" to connect")[0].split()[0]
-                    if "Invite" in person_name
-                    else ""
-                )
-                personal_note = (
-                    CONNECTION_NOTE.replace("{name}", first_name)
-                    if first_name
-                    else CONNECTION_NOTE
-                )
-                textarea.clear()
-                textarea.send_keys(personal_note)
-                random_delay(0.5, 1)
-
-                send_btn = shadow_root.find_element(
-                    By.CSS_SELECTOR, "button[aria-label='Send invitation']"
-                )
-                send_btn.click()
-                modal_handled = True
-                note_sent = personal_note
-                method = "with note"
-                print(f"    ✓ Sent (with note)")
-            except (TimeoutException, NoSuchElementException, StaleElementReferenceException) as note_err:
-                print(f"    ⚠ Add-a-note path failed: {type(note_err).__name__}: {note_err}")
-
-            # Option B: "Send without a note" via shadow DOM
-            if not modal_handled:
-                try:
-                    root_element = driver.find_element(By.XPATH, '//*[@id="root"]')
-                    shadow_containers = root_element.find_elements(
-                        By.XPATH, './/div[@data-testid="interop-shadowdom"]'
-                    )
-                    if shadow_containers:
-                        shadow_root = shadow_containers[0].shadow_root
-                        send_btn = shadow_root.find_element(
-                            By.CSS_SELECTOR, "button[aria-label='Send without a note']"
-                        )
-                        send_btn.click()
-                        modal_handled = True
-                        method = "without note"
-                        print(f"    ✓ Sent (without note)")
-                except (NoSuchElementException, TimeoutException):
-                    pass
-
-            # Option C: Plain "Send" / "Send invitation" via shadow DOM
-            if not modal_handled:
-                try:
-                    root_element = driver.find_element(By.XPATH, '//*[@id="root"]')
-                    shadow_containers = root_element.find_elements(
-                        By.XPATH, './/div[@data-testid="interop-shadowdom"]'
-                    )
-                    if shadow_containers:
-                        shadow_root = shadow_containers[0].shadow_root
-                        send_btn = shadow_root.find_element(
-                            By.CSS_SELECTOR,
-                            "button[aria-label='Send invitation'], button[aria-label='Send now']"
-                        )
-                        send_btn.click()
-                        modal_handled = True
-                        method = "direct invitation"
-                        print(f"    ✓ Sent (invitation)")
-                except (NoSuchElementException, TimeoutException):
-                    pass
-
-            if not modal_handled:
-                print(f"    ⚠ No modal detected – request may have been sent directly.")
-                method = "unknown/direct"
-
+            modal_handled, note_sent, method = _send_note_via_shadow_dom(person_name)
             random_delay(0.5, 1)
             dismiss_any_modal()
             sent += 1
@@ -207,6 +513,61 @@ def send_connection_requests_on_page(remaining=None, max_req_to_people=10, log_c
             dismiss_any_modal()
             random_delay(0.5, 1)
             continue
+
+    # --- Process Follow buttons (new: open profile in new tab → More → Connect) ---
+    # Collect Follow person info before iterating (to avoid stale references)
+    follow_people = []
+    try:
+        follow_containers = driver.find_elements(
+            By.CSS_SELECTOR, '[data-view-name="edge-creation-follow-action"]'
+        )
+        for fc in follow_containers:
+            try:
+                # Navigate up to the parent <a> that wraps the whole search result card
+                parent_link = fc.find_element(By.XPATH, './ancestor::a[@href]')
+                profile_url = parent_link.get_attribute("href")
+                # Try to get person name from aria-label of Follow button or link text
+                try:
+                    follow_btn = fc.find_element(By.CSS_SELECTOR, "button")
+                    aria = follow_btn.get_attribute("aria-label") or ""
+                    person_name = aria.replace("Follow ", "").strip() if aria.startswith("Follow") else aria
+                except Exception:
+                    person_name = "Unknown"
+                if profile_url and "/in/" in profile_url:
+                    follow_people.append((profile_url, person_name))
+            except Exception:
+                continue
+    except Exception:
+        pass
+
+    print(f"  Collected {len(follow_people)} Follow person profile(s) to process.")
+
+    for profile_url, person_name in follow_people:
+        if remaining is not None and sent >= remaining:
+            print(f"  Reached per-company limit, stopping.")
+            break
+        if sent >= max_req_to_people:
+            print(f"  Reached max requests per page, stopping.")
+            break
+
+        print(f"  → Follow person: {person_name} ({profile_url})")
+        success, modal_handled, note_sent, method = _handle_follow_person(profile_url, person_name)
+
+        if success:
+            sent += 1
+            entry = {
+                "person_name": person_name,
+                "method": f"follow→profile: {method}",
+                "note": note_sent,
+                "status": "sent" if modal_handled else "possibly sent",
+                "timestamp": datetime.now().isoformat(),
+                "page_url": profile_url,
+            }
+            log_entries.append(entry)
+            if log_callback:
+                log_callback(entry)
+        else:
+            print(f"    ✗ Could not send connection to {person_name}")
 
     return sent, log_entries
 
