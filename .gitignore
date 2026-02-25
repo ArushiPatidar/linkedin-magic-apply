@@ -3,3 +3,4 @@ log*
 log/
 *.csv
 __pycache__/
+statistics/
