@@ -42,11 +42,12 @@ def main():
         login()
 
         companies = load_companies("companies.txt")
-        for company in companies:
+        for company, max_requests in companies:
             search_url = build_search_url(company)
             print(f"\n{'='*60}")
             print(f"Processing company: {company}")
             print(f"URL: {search_url}")
+            print(f"Max requests: {max_requests}")
             print(f"{'='*60}")
 
             driver.get(search_url)
@@ -54,8 +55,8 @@ def main():
 
             company_sent = 0
             page = 1
-            while company_sent < MAX_REQUESTS_PER_COMPANY:
-                remaining = MAX_REQUESTS_PER_COMPANY - company_sent
+            while company_sent < max_requests:
+                remaining = max_requests - company_sent
                 print(f"\n— Page {page} for '{company}' (remaining: {remaining}) —", flush=True)
 
                 log_callback = lambda entry: write_log_entry(entry, company, page)
@@ -64,8 +65,8 @@ def main():
                 total_sent += sent
                 print(f"  Sent {sent} connection(s) on this page. (Company total: {company_sent})", flush=True)
 
-                if company_sent >= MAX_REQUESTS_PER_COMPANY:
-                    print(f"  Reached max {MAX_REQUESTS_PER_COMPANY} for '{company}', moving on.", flush=True)
+                if company_sent >= max_requests:
+                    print(f"  Reached max {max_requests} for '{company}', moving on.", flush=True)
                     break
                 if not go_to_next_page():
                     print("  No more pages.", flush=True)

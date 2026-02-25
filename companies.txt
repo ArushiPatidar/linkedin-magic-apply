@@ -1,8 +1,8 @@
-Swiggy
-Intuit
-Microsoft
-Cisco
-Honeywell
+Swiggy,1
+Intuit,2
+Microsoft,3
+Cisco,4
+Honeywell,5
 Qualcomm
-Amazon
-Groww
+Amazon,7
+Groww,8

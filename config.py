@@ -12,10 +12,29 @@ def log(message):
     """Print a message and flush immediately so it appears in real time."""
     print(message, flush=True)
 
-def load_companies(filepath="companies.txt"):
-    """Read company names from a text file, one per line."""
+def load_companies(filepath=COMPANIES_FILE):
+    """Read company names from a text file, one per line.
+    Supports optional comma-separated request count, e.g. 'Microsoft,25'.
+    Returns a list of (company_name, max_requests) tuples.
+    """
+    companies = []
     with open(filepath, "r") as f:
-        return [line.strip() for line in f if line.strip()]
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            if "," in line:
+                parts = line.split(",", 1)
+                name = parts[0].strip()
+                try:
+                    count = int(parts[1].strip())
+                except ValueError:
+                    count = MAX_REQUESTS_PER_COMPANY
+            else:
+                name = line
+                count = MAX_REQUESTS_PER_COMPANY
+            companies.append((name, count))
+    return companies
 
 def build_search_url(company_name):
     """Build a LinkedIn people search URL for the given company."""
