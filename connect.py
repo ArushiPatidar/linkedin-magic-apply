@@ -14,7 +14,7 @@ import time
 from datetime import datetime
 
 
-def send_connection_requests_on_page(remaining=None, log_callback=None):
+def send_connection_requests_on_page(remaining=None, max_req_to_people=10, log_callback=None):
     """Find all Connect buttons on the current page and click them.
     Returns (sent_count, log_entries) where log_entries is a list of dicts."""
     sent = 0
@@ -25,7 +25,7 @@ def send_connection_requests_on_page(remaining=None, log_callback=None):
     )
     print(f"  Found {len(connect_containers)} Connect button(s) on this page.")
 
-    for idx in range(len(connect_containers)):
+    for idx in range(min(len(connect_containers),max_req_to_people)):
         if remaining is not None and sent >= remaining:
             print(f"  Reached per-company limit, stopping.")
             break
@@ -88,7 +88,7 @@ def send_connection_requests_on_page(remaining=None, log_callback=None):
             # Option A: Access modal via shadow DOM, click "Add a note", fill textarea, send
             try:
                 print("before add note")
-                driver.implicitly_wait(5)
+                driver.implicitly_wait(1)
 
                 root_element = driver.find_element(By.XPATH, '//*[@id="root"]')
                 shadow_containers = root_element.find_elements(
@@ -216,7 +216,7 @@ def go_to_next_page():
     """Click the 'Next' pagination button. Returns True if successful."""
     try:
         next_btn = driver.find_element(
-            By.CSS_SELECTOR, 'button[aria-label="Next"]'
+            By.CSS_SELECTOR, 'button[data-testid="pagination-controls-next-button-visible"]'
         )
         if next_btn.is_enabled():
             driver.execute_script(

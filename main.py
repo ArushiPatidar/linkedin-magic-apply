@@ -59,7 +59,7 @@ def main():
                 print(f"\n— Page {page} for '{company}' (remaining: {remaining}) —", flush=True)
 
                 log_callback = lambda entry: write_log_entry(entry, company, page)
-                sent, log_entries = send_connection_requests_on_page(remaining=remaining, log_callback=log_callback)
+                sent, log_entries = send_connection_requests_on_page(remaining=remaining, max_req_to_people=remaining, log_callback=log_callback)
                 company_sent += sent
                 total_sent += sent
                 print(f"  Sent {sent} connection(s) on this page. (Company total: {company_sent})", flush=True)

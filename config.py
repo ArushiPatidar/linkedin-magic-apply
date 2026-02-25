@@ -5,7 +5,7 @@ CREDENTIAL_FILE = "credential.json"
 COMPANIES_FILE = "companies.txt"
 CONNECTION_NOTE_FILE = "connection_note.txt"
 MAX_PAGES = 5
-MAX_REQUESTS_PER_COMPANY = 4
+MAX_REQUESTS_PER_COMPANY = 3
 DELAY_BETWEEN_ACTIONS = (2, 4)
 
 def log(message):
