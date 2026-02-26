@@ -6,7 +6,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
-CREDENTIAL_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), "credential_instahyre.json")
+CREDENTIAL_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), "instahyre/credential_instahyre.json")
 LOGIN_URL = "https://www.instahyre.com/login/"
 
 
@@ -24,6 +24,8 @@ def run_instahyre():
     driver.get(LOGIN_URL)
 
     wait = WebDriverWait(driver, 15)
+
+    time.sleep(2)
 
     # Fill email
     email_input = wait.until(EC.presence_of_element_located((By.ID, "email")))

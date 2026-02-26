@@ -7,8 +7,8 @@ from selenium.common.exceptions import (
     ElementClickInterceptedException,
     StaleElementReferenceException,
 )
-from browser import driver
-from config import DELAY_BETWEEN_ACTIONS
+from linkedin.browser import driver
+from linkedin.config import DELAY_BETWEEN_ACTIONS
 
 
 def random_delay(min_sec=0.5, max_sec=1.5):

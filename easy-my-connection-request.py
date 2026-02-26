@@ -1,5 +1,5 @@
 import argparse
-from main import main as linkedin_main
+from linkedin.main import main as linkedin_main
 
 def main():
     parser = argparse.ArgumentParser(description="Automate connection requests.")

@@ -1,8 +1,8 @@
-from config import MAX_PAGES, MAX_REQUESTS_PER_COMPANY, load_companies, build_search_url
-from browser import driver
-from auth import login
-from utils import random_delay, dismiss_any_modal, scroll_to_bottom
-from connect import send_connection_requests_on_page, go_to_next_page
+from linkedin.config import MAX_PAGES, MAX_REQUESTS_PER_COMPANY, load_companies, build_search_url
+from linkedin.browser import driver
+from linkedin.auth import login
+from linkedin.utils import random_delay, dismiss_any_modal, scroll_to_bottom
+from linkedin.connect import send_connection_requests_on_page, go_to_next_page
 import csv
 import os
 from datetime import datetime

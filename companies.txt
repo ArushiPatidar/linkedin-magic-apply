@@ -1,3 +1,5 @@
+Zepto,15
+Databricks,12
 Salesforce,12
 Samsung,15
 Flipkart,11

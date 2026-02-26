@@ -1,7 +1,7 @@
 import json
 import urllib.parse
 
-CREDENTIAL_FILE = "credential.json"
+CREDENTIAL_FILE = "linkedin/credential.json"
 COMPANIES_FILE = "companies.txt"
 CONNECTION_NOTE_FILE = "connection_note.txt"
 MAX_PAGES = 5

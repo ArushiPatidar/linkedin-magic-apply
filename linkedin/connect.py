@@ -7,9 +7,9 @@ from selenium.common.exceptions import (
     NoSuchElementException,
     StaleElementReferenceException,
 )
-from browser import driver, wait
-from config import CONNECTION_NOTE
-from utils import random_delay, dismiss_any_modal
+from linkedin.browser import driver, wait
+from linkedin.config import CONNECTION_NOTE
+from linkedin.utils import random_delay, dismiss_any_modal
 import time
 from datetime import datetime
 
@@ -270,6 +270,58 @@ def _handle_follow_person(profile_url, person_name):
         except Exception:
             pass
 
+        # Click the "Follow" button on the profile page (if present)
+        follow_btn = None
+
+        # Strategy 1: aria-label starting with "Follow"
+        try:
+            follow_btn = WebDriverWait(driver, 3).until(
+                EC.element_to_be_clickable((
+                    By.CSS_SELECTOR,
+                    'button[aria-label^="Follow"]'
+                ))
+            )
+            print(f"    Found 'Follow' button via aria-label selector")
+        except (TimeoutException, NoSuchElementException):
+            print(f"    ⚠ Follow Strategy 1 (aria-label) failed")
+
+        # Strategy 2: button with span text "Follow" (scan all buttons)
+        if not follow_btn:
+            try:
+                buttons = driver.find_elements(By.TAG_NAME, "button")
+                for btn in buttons:
+                    try:
+                        spans = btn.find_elements(By.TAG_NAME, "span")
+                        for span in spans:
+                            if span.text.strip() == "Follow":
+                                btn_class = btn.get_attribute("class") or ""
+                                if "artdeco-button" in btn_class:
+                                    follow_btn = btn
+                                    print(f"    Found 'Follow' button via button scan")
+                                    break
+                        if follow_btn:
+                            break
+                    except StaleElementReferenceException:
+                        continue
+            except Exception:
+                print(f"    ⚠ Follow Strategy 2 (button scan) failed")
+
+        if follow_btn:
+            try:
+                driver.execute_script("arguments[0].scrollIntoView({block:'center'});", follow_btn)
+                random_delay(0.3, 0.5)
+                try:
+                    driver.execute_script("arguments[0].click();", follow_btn)
+                    print(f"    ✓ 'Follow' button JS-clicked")
+                except Exception:
+                    follow_btn.click()
+                    print(f"    ✓ 'Follow' button clicked")
+                random_delay(1.5, 2.5)
+            except (ElementClickInterceptedException, StaleElementReferenceException) as e:
+                print(f"    ⚠ Could not click 'Follow' button: {type(e).__name__}, continuing...")
+        else:
+            print(f"    ℹ 'Follow' button not found – may have already been clicked, continuing...")
+
         # Click "More" button on the profile — try multiple strategies
         more_btn = None
 
@@ -517,7 +569,6 @@ def send_connection_requests_on_page(remaining=None, max_req_to_people=10, log_c
             # Retry click up to 3 times if intercepted
             click_success = False
             for attempt in range(3):
-                print("attempt : ", attempt)
                 try:
                     connect_btn.click()
                     click_success = True

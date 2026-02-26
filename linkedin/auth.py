@@ -1,9 +1,9 @@
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
-from browser import driver, wait
-from config import EMAIL, PASSWORD
-from utils import random_delay
+from linkedin.browser import driver, wait
+from linkedin.config import EMAIL, PASSWORD
+from linkedin.utils import random_delay
 
 
 def login():
