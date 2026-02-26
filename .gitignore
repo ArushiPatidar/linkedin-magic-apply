@@ -1,4 +1,6 @@
 credential.json
+credential*
+credential_instahyre.json
 log*
 log/
 *.csv

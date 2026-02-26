@@ -1,3 +1,5 @@
+Salesforce,12
+Samsung,15
 Flipkart,11
 Oracle,12
 Uber,7
