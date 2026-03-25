@@ -270,85 +270,84 @@ def _handle_follow_person(profile_url, person_name):
         except Exception:
             pass
 
-        # Click the "Follow" button on the profile page (if present)
-        follow_btn = None
+        # NOTE: We intentionally do NOT click Follow here.
+        # We only want to connect (with a note), not follow without a note.
 
-        # Strategy 1: aria-label starting with "Follow"
-        try:
-            follow_btn = WebDriverWait(driver, 3).until(
-                EC.element_to_be_clickable((
-                    By.CSS_SELECTOR,
-                    'button[aria-label^="Follow"]'
-                ))
-            )
-            print(f"    Found 'Follow' button via aria-label selector")
-        except (TimeoutException, NoSuchElementException):
-            print(f"    ⚠ Follow Strategy 1 (aria-label) failed")
-
-        # Strategy 2: button with span text "Follow" (scan all buttons)
-        if not follow_btn:
-            try:
-                buttons = driver.find_elements(By.TAG_NAME, "button")
-                for btn in buttons:
-                    try:
-                        spans = btn.find_elements(By.TAG_NAME, "span")
-                        for span in spans:
-                            if span.text.strip() == "Follow":
-                                btn_class = btn.get_attribute("class") or ""
-                                if "artdeco-button" in btn_class:
-                                    follow_btn = btn
-                                    print(f"    Found 'Follow' button via button scan")
-                                    break
-                        if follow_btn:
-                            break
-                    except StaleElementReferenceException:
-                        continue
-            except Exception:
-                print(f"    ⚠ Follow Strategy 2 (button scan) failed")
-
-        if follow_btn:
-            try:
-                driver.execute_script("arguments[0].scrollIntoView({block:'center'});", follow_btn)
-                random_delay(0.3, 0.5)
-                try:
-                    driver.execute_script("arguments[0].click();", follow_btn)
-                    print(f"    ✓ 'Follow' button JS-clicked")
-                except Exception:
-                    follow_btn.click()
-                    print(f"    ✓ 'Follow' button clicked")
-                random_delay(1.5, 2.5)
-            except (ElementClickInterceptedException, StaleElementReferenceException) as e:
-                print(f"    ⚠ Could not click 'Follow' button: {type(e).__name__}, continuing...")
-        else:
-            print(f"    ℹ 'Follow' button not found – may have already been clicked, continuing...")
-
-        # Click "More" button on the profile — try multiple strategies
+        # Click the 3-dots "More" button on the profile — try multiple strategies
         more_btn = None
 
-        # Strategy 1: ID ending in -profile-overflow-action
+        # Strategy 1: aria-label="More" with aria-expanded attribute (profile 3-dots button)
         try:
-            more_btn = WebDriverWait(driver, 5).until(
-                EC.element_to_be_clickable((
+            # The profile 3-dots button has aria-expanded, nav "More" does not
+            more_candidates = driver.find_elements(
+                By.CSS_SELECTOR,
+                'button[aria-label="More"][aria-expanded]'
+            )
+            if more_candidates:
+                # Prefer the one near profile actions (not in nav)
+                for candidate in more_candidates:
+                    # Check it's not inside the nav bar
+                    try:
+                        candidate.find_element(By.XPATH, './ancestor::nav')
+                        continue  # skip nav buttons
+                    except NoSuchElementException:
+                        more_btn = candidate
+                        break
+                if not more_btn and more_candidates:
+                    more_btn = more_candidates[0]
+
+            if more_btn:
+                WebDriverWait(driver, 3).until(EC.element_to_be_clickable(more_btn))
+                print(f"    Found 'More' (3-dots) button via aria-label='More' + aria-expanded")
+            else:
+                raise NoSuchElementException("No matching More button with aria-expanded")
+        except (TimeoutException, NoSuchElementException):
+            print(f"    ⚠ Strategy 1 (aria-label='More' + aria-expanded) failed")
+
+        # Strategy 2: aria-label="More" (broader, new LinkedIn HTML)
+        if not more_btn:
+            try:
+                more_candidates = driver.find_elements(
+                    By.CSS_SELECTOR, 'button[aria-label="More"]'
+                )
+                # Filter out nav buttons
+                for candidate in more_candidates:
+                    try:
+                        candidate.find_element(By.XPATH, './ancestor::nav')
+                        continue
+                    except NoSuchElementException:
+                        more_btn = candidate
+                        break
+                if more_btn:
+                    print(f"    Found 'More' (3-dots) button via aria-label='More' (filtered)")
+                else:
+                    raise NoSuchElementException("No non-nav More button found")
+            except (NoSuchElementException, TimeoutException):
+                print(f"    ⚠ Strategy 2 (aria-label='More' filtered) failed")
+
+        # Strategy 3: ID ending in -profile-overflow-action (old)
+        if not more_btn:
+            try:
+                more_btn = driver.find_element(
                     By.CSS_SELECTOR,
                     'button[id$="-profile-overflow-action"]'
-                ))
-            )
-            print(f"    Found 'More' button via id selector")
-        except TimeoutException:
-            print(f"    ⚠ Strategy 1 (id selector) failed")
+                )
+                print(f"    Found 'More' button via id selector")
+            except NoSuchElementException:
+                print(f"    ⚠ Strategy 3 (id selector) failed")
 
-        # Strategy 2: aria-label="More actions"
+        # Strategy 4: aria-label="More actions" (old)
         if not more_btn:
             try:
                 more_btn = driver.find_element(
                     By.CSS_SELECTOR,
                     'button[aria-label="More actions"]'
                 )
-                print(f"    Found 'More' button via aria-label selector")
+                print(f"    Found 'More' button via aria-label='More actions' selector")
             except NoSuchElementException:
-                print(f"    ⚠ Strategy 2 (aria-label) failed")
+                print(f"    ⚠ Strategy 4 (aria-label='More actions') failed")
 
-        # Strategy 3: artdeco-dropdown trigger containing span "More"
+        # Strategy 5: artdeco-dropdown trigger containing span "More" (old)
         if not more_btn:
             try:
                 more_btn = driver.find_element(
@@ -357,29 +356,39 @@ def _handle_follow_person(profile_url, person_name):
                 )
                 print(f"    Found 'More' button via XPath span text")
             except NoSuchElementException:
-                print(f"    ⚠ Strategy 3 (XPath span text) failed")
+                print(f"    ⚠ Strategy 5 (XPath span text) failed")
 
-        # Strategy 4: find all buttons, look for one with child span "More" near the profile actions
+        # Strategy 6: scan all non-nav buttons for overflow/3-dots icon or "More" text
         if not more_btn:
             try:
                 buttons = driver.find_elements(By.TAG_NAME, "button")
                 for btn in buttons:
                     try:
+                        # Skip nav buttons
+                        try:
+                            btn.find_element(By.XPATH, './ancestor::nav')
+                            continue
+                        except NoSuchElementException:
+                            pass
+                        # Check for overflow SVG icon (3 dots)
+                        svgs = btn.find_elements(By.CSS_SELECTOR, 'svg[id*="overflow"]')
+                        if svgs:
+                            more_btn = btn
+                            print(f"    Found 'More' (3-dots) button via overflow SVG scan")
+                            break
+                        # Check for span text "More"
                         spans = btn.find_elements(By.TAG_NAME, "span")
                         for span in spans:
                             if span.text.strip() == "More":
-                                # Verify it's the profile actions "More", not something else
-                                btn_class = btn.get_attribute("class") or ""
-                                if "artdeco-dropdown__trigger" in btn_class:
-                                    more_btn = btn
-                                    print(f"    Found 'More' button via button scan (class: {btn_class[:60]})")
-                                    break
+                                more_btn = btn
+                                print(f"    Found 'More' button via button text scan")
+                                break
                         if more_btn:
                             break
                     except StaleElementReferenceException:
                         continue
             except Exception:
-                print(f"    ⚠ Strategy 4 (button scan) failed")
+                print(f"    ⚠ Strategy 6 (button scan) failed")
 
         if not more_btn:
             print(f"    ✗ Could not find 'More' button on profile for {person_name} after all strategies")
@@ -409,17 +418,45 @@ def _handle_follow_person(profile_url, person_name):
         random_delay(1, 1.5)
         print(f"    Dropdown should be open. Looking for 'Connect' option...")
 
-        # Click "Connect" from the dropdown — it's a div[role="button"] with aria-label containing "Invite" and "to connect"
+        # Click "Connect" from the dropdown
         connect_option = None
+
+        # Strategy 1: div with aria-label containing "to connect" (new LinkedIn HTML)
         try:
             connect_option = WebDriverWait(driver, 5).until(
                 EC.element_to_be_clickable((
                     By.CSS_SELECTOR,
-                    'div.artdeco-dropdown__item[aria-label*="to connect"]'
+                    'div[aria-label*="to connect"]'
                 ))
             )
-        except TimeoutException:
-            # Fallback: look for the dropdown item by aria-label containing "connect"
+            print(f"    Found 'Connect' option via div[aria-label*='to connect']")
+        except (TimeoutException, NoSuchElementException):
+            print(f"    ⚠ Connect Strategy 1 (div aria-label) failed")
+
+        # Strategy 2: any element with aria-label containing "to connect"
+        if not connect_option:
+            try:
+                connect_option = driver.find_element(
+                    By.CSS_SELECTOR,
+                    '[aria-label*="to connect"]'
+                )
+                print(f"    Found 'Connect' option via [aria-label*='to connect']")
+            except NoSuchElementException:
+                print(f"    ⚠ Connect Strategy 2 (any aria-label) failed")
+
+        # Strategy 3: old artdeco-dropdown__item with aria-label
+        if not connect_option:
+            try:
+                connect_option = driver.find_element(
+                    By.CSS_SELECTOR,
+                    'div.artdeco-dropdown__item[aria-label*="to connect"]'
+                )
+                print(f"    Found 'Connect' option via artdeco-dropdown__item")
+            except NoSuchElementException:
+                print(f"    ⚠ Connect Strategy 3 (artdeco-dropdown__item) failed")
+
+        # Strategy 4: old artdeco-dropdown__item with role="button"
+        if not connect_option:
             try:
                 items = driver.find_elements(
                     By.CSS_SELECTOR, 'div.artdeco-dropdown__item[role="button"]'
@@ -428,9 +465,43 @@ def _handle_follow_person(profile_url, person_name):
                     aria = item.get_attribute("aria-label") or ""
                     if "connect" in aria.lower():
                         connect_option = item
+                        print(f"    Found 'Connect' option via artdeco role=button scan")
                         break
             except Exception:
                 pass
+
+        # Strategy 5: scan visible divs/elements for text "Connect" inside the dropdown area
+        if not connect_option:
+            try:
+                # Look for any clickable element containing "Connect" text that appeared after clicking More
+                candidates = driver.find_elements(
+                    By.XPATH,
+                    '//div[contains(@aria-label,"connect") or contains(@aria-label,"Connect")]'
+                )
+                for c in candidates:
+                    if c.is_displayed():
+                        connect_option = c
+                        print(f"    Found 'Connect' option via XPath aria-label scan")
+                        break
+            except Exception:
+                pass
+
+        # Strategy 6: find <p> or <span> with text "Connect" and click its parent div
+        if not connect_option:
+            try:
+                connect_texts = driver.find_elements(
+                    By.XPATH,
+                    '//p[normalize-space(text())="Connect"]/ancestor::div[@aria-label] | '
+                    '//span[normalize-space(text())="Connect"]/ancestor::div[@aria-label]'
+                )
+                for ct in connect_texts:
+                    aria = ct.get_attribute("aria-label") or ""
+                    if "connect" in aria.lower() and ct.is_displayed():
+                        connect_option = ct
+                        print(f"    Found 'Connect' option via text ancestor scan")
+                        break
+            except Exception:
+                print(f"    ⚠ Connect Strategy 6 (text scan) failed")
 
         if not connect_option:
             print(f"    ✗ Could not find 'Connect' in More dropdown for {person_name}")
@@ -438,7 +509,22 @@ def _handle_follow_person(profile_url, person_name):
             driver.switch_to.window(original_window)
             return False, False, "", ""
 
-        connect_option.click()
+        print(f"    Clicking 'Connect' option...")
+        try:
+            driver.execute_script("arguments[0].scrollIntoView({block:'center'});", connect_option)
+            random_delay(0.3, 0.5)
+            driver.execute_script("arguments[0].click();", connect_option)
+            print(f"    ✓ 'Connect' option JS-clicked")
+        except Exception:
+            try:
+                connect_option.click()
+                print(f"    ✓ 'Connect' option regular-clicked")
+            except Exception as e:
+                print(f"    ✗ Could not click 'Connect' option: {e}")
+                driver.close()
+                driver.switch_to.window(original_window)
+                return False, False, "", ""
+
         random_delay(1, 1.5)
 
         # Now use the shared note-sending logic
@@ -472,41 +558,91 @@ def send_connection_requests_on_page(remaining=None, max_req_to_people=10, log_c
     sent = 0
     log_entries = []
 
-    follow_containers = driver.find_elements(
-        By.CSS_SELECTOR, '[data-view-name="edge-creation-follow-action"]'
-    )
-    print(f"  Found {len(follow_containers)} Follow button(s) on this page.")
+    # ── New selectors based on updated LinkedIn HTML ──
+    # Connect buttons: <a aria-label="Invite ... to connect" href="/preload/search-custom-invite/...">
+    # Follow buttons:  <button aria-label="Follow ...">
 
-    connect_containers = driver.find_elements(
-        By.CSS_SELECTOR, '[data-view-name="edge-creation-connect-action"]'
+    # Try new selectors first, fall back to old ones
+    follow_buttons = driver.find_elements(
+        By.CSS_SELECTOR, 'button[aria-label^="Follow "]'
     )
-    print(f"  Found {len(connect_containers)} Connect button(s) on this page.")
-
-    # --- Process Follow buttons FIRST (open profile in new tab → More → Connect) ---
-    # Collect Follow person info before iterating (to avoid stale references)
-    follow_people = []
-    try:
-        follow_containers = driver.find_elements(
+    # Filter out non-person follow buttons (e.g. company follow)
+    follow_buttons = [
+        btn for btn in follow_buttons
+        if btn.get_attribute("aria-label") and "Follow " in btn.get_attribute("aria-label")
+    ]
+    # Fallback: old selector
+    if not follow_buttons:
+        follow_containers_old = driver.find_elements(
             By.CSS_SELECTOR, '[data-view-name="edge-creation-follow-action"]'
         )
-        for fc in follow_containers:
+        print(f"  Found {len(follow_containers_old)} Follow button(s) via old selector.")
+    else:
+        print(f"  Found {len(follow_buttons)} Follow button(s) on this page (new selector).")
+
+    connect_links = driver.find_elements(
+        By.CSS_SELECTOR, 'a[aria-label*="to connect"]'
+    )
+    # Fallback: old selector
+    if not connect_links:
+        connect_containers_old = driver.find_elements(
+            By.CSS_SELECTOR, '[data-view-name="edge-creation-connect-action"]'
+        )
+        print(f"  Found {len(connect_containers_old)} Connect button(s) via old selector.")
+    else:
+        print(f"  Found {len(connect_links)} Connect button(s) on this page (new selector).")
+
+    # --- Process Follow buttons FIRST (open profile in new tab → More → Connect) ---
+    follow_people = []
+
+    # New HTML: each follow button has aria-label="Follow <Name>", profile URL is in ancestor listitem
+    for btn in follow_buttons:
+        try:
+            aria = btn.get_attribute("aria-label") or ""
+            person_name = aria.replace("Follow ", "").strip() if aria.startswith("Follow") else "Unknown"
+
+            # Navigate up to the listitem container, then find the profile link
             try:
-                # Navigate up to the parent <a> that wraps the whole search result card
-                parent_link = fc.find_element(By.XPATH, './ancestor::a[@href]')
-                profile_url = parent_link.get_attribute("href")
-                # Try to get person name from aria-label of Follow button or link text
+                listitem = btn.find_element(By.XPATH, './ancestor::div[@role="listitem"]')
+                profile_link = listitem.find_element(
+                    By.CSS_SELECTOR, 'a[href*="/in/"]'
+                )
+                profile_url = profile_link.get_attribute("href")
+            except NoSuchElementException:
+                # Fallback: try ancestor <a>
                 try:
-                    follow_btn = fc.find_element(By.CSS_SELECTOR, "button")
-                    aria = follow_btn.get_attribute("aria-label") or ""
-                    person_name = aria.replace("Follow ", "").strip() if aria.startswith("Follow") else aria
+                    parent_link = btn.find_element(By.XPATH, './ancestor::a[@href]')
+                    profile_url = parent_link.get_attribute("href")
+                except NoSuchElementException:
+                    profile_url = None
+
+            if profile_url and "/in/" in profile_url:
+                follow_people.append((profile_url, person_name))
+        except (StaleElementReferenceException, NoSuchElementException):
+            continue
+
+    # Fallback: old selector path
+    if not follow_people:
+        try:
+            follow_containers = driver.find_elements(
+                By.CSS_SELECTOR, '[data-view-name="edge-creation-follow-action"]'
+            )
+            for fc in follow_containers:
+                try:
+                    parent_link = fc.find_element(By.XPATH, './ancestor::a[@href]')
+                    profile_url = parent_link.get_attribute("href")
+                    try:
+                        follow_btn = fc.find_element(By.CSS_SELECTOR, "button")
+                        aria = follow_btn.get_attribute("aria-label") or ""
+                        person_name = aria.replace("Follow ", "").strip() if aria.startswith("Follow") else aria
+                    except Exception:
+                        person_name = "Unknown"
+                    if profile_url and "/in/" in profile_url:
+                        follow_people.append((profile_url, person_name))
                 except Exception:
-                    person_name = "Unknown"
-                if profile_url and "/in/" in profile_url:
-                    follow_people.append((profile_url, person_name))
-            except Exception:
-                continue
-    except Exception:
-        pass
+                    continue
+        except Exception:
+            pass
 
     print(f"  Collected {len(follow_people)} Follow person profile(s) to process.")
 
@@ -538,7 +674,17 @@ def send_connection_requests_on_page(remaining=None, max_req_to_people=10, log_c
             print(f"    ✗ Could not send connection to {person_name}")
 
     # --- Process Connect buttons SECOND ---
-    for idx in range(min(len(connect_containers), max_req_to_people)):
+    # New HTML: connect buttons are <a aria-label="Invite X to connect">
+    # Re-query each iteration to avoid stale refs
+    num_connect = len(connect_links) if connect_links else 0
+    # Fallback count from old selector
+    if not connect_links:
+        connect_containers_old = driver.find_elements(
+            By.CSS_SELECTOR, '[data-view-name="edge-creation-connect-action"]'
+        )
+        num_connect = len(connect_containers_old)
+
+    for idx in range(min(num_connect, max_req_to_people)):
         if remaining is not None and sent >= remaining:
             print(f"  Reached per-company limit, stopping.")
             break
@@ -550,14 +696,26 @@ def send_connection_requests_on_page(remaining=None, max_req_to_people=10, log_c
             dismiss_any_modal()
             random_delay(0.3, 0.8)
 
-            containers = driver.find_elements(
-                By.CSS_SELECTOR, '[data-view-name="edge-creation-connect-action"]'
+            # Re-query connect buttons (new selector first, then old)
+            current_connect = driver.find_elements(
+                By.CSS_SELECTOR, 'a[aria-label*="to connect"]'
             )
-            if idx >= len(containers):
+            use_old_selector = False
+            if not current_connect:
+                current_connect = driver.find_elements(
+                    By.CSS_SELECTOR, '[data-view-name="edge-creation-connect-action"]'
+                )
+                use_old_selector = True
+
+            if idx >= len(current_connect):
                 break
 
-            container = containers[idx]
-            connect_btn = container.find_element(By.CSS_SELECTOR, "a")
+            if use_old_selector:
+                container = current_connect[idx]
+                connect_btn = container.find_element(By.CSS_SELECTOR, "a")
+            else:
+                connect_btn = current_connect[idx]
+
             person_name = connect_btn.get_attribute("aria-label") or "Unknown"
             print(f"  → Clicking: {person_name}")
 
@@ -578,16 +736,26 @@ def send_connection_requests_on_page(remaining=None, max_req_to_people=10, log_c
                     dismiss_any_modal()
                     random_delay(0.5, 1)
                     try:
-                        containers = driver.find_elements(
-                            By.CSS_SELECTOR, '[data-view-name="edge-creation-connect-action"]'
+                        current_connect = driver.find_elements(
+                            By.CSS_SELECTOR, 'a[aria-label*="to connect"]'
                         )
-                        if idx < len(containers):
-                            container = containers[idx]
-                            connect_btn = container.find_element(By.CSS_SELECTOR, "a")
-                            driver.execute_script(
-                                "arguments[0].scrollIntoView({block:'center'});", connect_btn
+                        if not current_connect:
+                            current_connect = driver.find_elements(
+                                By.CSS_SELECTOR, '[data-view-name="edge-creation-connect-action"]'
                             )
-                            random_delay(0.5, 1)
+                            if idx < len(current_connect):
+                                connect_btn = current_connect[idx].find_element(By.CSS_SELECTOR, "a")
+                            else:
+                                break
+                        else:
+                            if idx < len(current_connect):
+                                connect_btn = current_connect[idx]
+                            else:
+                                break
+                        driver.execute_script(
+                            "arguments[0].scrollIntoView({block:'center'});", connect_btn
+                        )
+                        random_delay(0.5, 1)
                     except Exception:
                         break
 

@@ -1,16 +1,14 @@
-Zepto,15
-Databricks,12
-Salesforce,12
-Samsung,15
-Flipkart,11
-Oracle,12
-Uber,7
-PhonePe, 8
-Swiggy,1
-Intuit,2
-Microsoft,3
-Cisco,4
-Honeywell,5
-Qualcomm
-Amazon,7
-Groww,8
+Goldman Sachs,15
+AMD,10
+Adobe,10
+Cisco,10
+Accenture,10
+Wipro,10
+TCS,10
+Infosys,10
+Paypal,10
+Intuit,10
+Zepto,5
+Databricks,2
+Microsoft,10
+Google,15

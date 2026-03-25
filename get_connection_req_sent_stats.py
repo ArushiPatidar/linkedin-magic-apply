@@ -3,7 +3,7 @@ import os
 import glob
 from collections import defaultdict
 
-LOG_DIR = os.path.join(os.path.dirname(__file__), "log")
+LOG_DIR = os.path.join(os.path.dirname(__file__), "linkedin/log")
 STATS_DIR = os.path.join(os.path.dirname(__file__), "statistics")
 STATS_FILE = os.path.join(STATS_DIR, "statistics.csv")
 

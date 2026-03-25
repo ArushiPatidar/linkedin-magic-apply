@@ -9,14 +9,15 @@ from instahyre.instahyre_login import run_instahyre
 
 def apply_to_jobs():
     driver = run_instahyre()
-    wait = WebDriverWait(driver, 10)
+    time.sleep(30)
+    wait = WebDriverWait(driver, 25)
 
     # Wait for "View »" button to appear
     view_button = wait.until(EC.element_to_be_clickable(
         (By.ID, "interested-btn")
     ))
     view_button.click()
-    time.sleep(2)
+    time.sleep(15)
 
     while True:
         try:
@@ -27,7 +28,7 @@ def apply_to_jobs():
             apply_button.click()
             print("Applied to a job.")
 
-            time.sleep(2)
+            time.sleep(15)
 
         except (TimeoutException, Exception) as e:
             print(f"Primary apply button not found: {e}")
@@ -38,7 +39,7 @@ def apply_to_jobs():
                 ))
                 bulk_apply_button.click()
                 print("Clicked bulk Apply button.")
-                time.sleep(2)
+                time.sleep(12)
                 continue
             except (TimeoutException, Exception):
                 print("No more buttons found. Done applying.")

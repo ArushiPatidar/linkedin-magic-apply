@@ -1,0 +1,14 @@
+Salesforce,12
+Samsung,15
+Flipkart,11
+Oracle,12
+Uber,7
+PhonePe, 8
+Swiggy,1
+Intuit,2
+Microsoft,3
+Cisco,4
+Honeywell,5
+Qualcomm
+Amazon,7
+Groww,8
