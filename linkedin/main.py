@@ -1,4 +1,4 @@
-from linkedin.config import MAX_PAGES, MAX_REQUESTS_PER_COMPANY, load_companies, build_search_url
+from linkedin.config import MAX_PAGES, MAX_REQUESTS_PER_COMPANY, load_companies, build_search_url, decrement_company_count, update_companies_old
 from linkedin.browser import driver
 from linkedin.auth import login
 from linkedin.utils import random_delay, dismiss_any_modal, scroll_to_bottom
@@ -63,6 +63,13 @@ def main():
                 sent, log_entries = send_connection_requests_on_page(remaining=remaining, max_req_to_people=remaining, log_callback=log_callback)
                 company_sent += sent
                 total_sent += sent
+
+                # Decrement companies.txt and update companies_old.txt after each page
+                if sent > 0:
+                    decrement_company_count(company, sent)
+                    update_companies_old(company, sent)
+                    print(f"  [✓] Updated companies.txt (-{sent}) and companies_old.txt (+{sent}) for '{company}'", flush=True)
+
                 print(f"  Sent {sent} connection(s) on this page. (Company total: {company_sent})", flush=True)
 
                 if company_sent >= max_requests:

@@ -1,14 +1,39 @@
+AMD,18
+Accenture,18
+Adobe,10
+Akamai,7
+Amazon,12
+Capgemini,5
+Cisco,10
+Cognizant,15
+Databricks,2
+FICO,9
+Flipkart,11
+Goldman Sachs,15
+Goldman sachs,7
+Google,15
+Groww,8
+HCL,14
+Honeywell,17
+IBM,15
+Infosys,26
+Intuit,10
+JP Morgan Chaase,15
+LTI,12
+Microsoft,6
+Mindtree,11
+Oracle,12
+Paypal,10
+PhonePe,8
+Pure,8
+Qualcomm,0
 Salesforce,12
 Samsung,15
-Flipkart,11
-Oracle,12
-Uber,7
-PhonePe, 8
 Swiggy,1
-Intuit,2
-Microsoft,3
-Cisco,4
-Honeywell,5
-Qualcomm
-Amazon,7
-Groww,8
+TCS,18
+Tech Mahindra,13
+Uber,7
+WIPRO,16
+Walmart,20
+Wipro,10
+Zepto,5
