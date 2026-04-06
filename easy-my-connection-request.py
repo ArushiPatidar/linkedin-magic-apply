@@ -1,5 +1,5 @@
 import argparse
-from linkedin.main import main as linkedin_main
+from linkedin.main import main as linkedin_main, pa_main as linkedin_pa_main
 
 def main():
     parser = argparse.ArgumentParser(description="Automate connection requests.")
@@ -10,9 +10,16 @@ def main():
         default="linkedin",
         help="Portal to use: linkedin or instahyre (default: linkedin)"
     )
+    parser.add_argument(
+        "--pa",
+        action="store_true",
+        help="Ping Again: re-send messages to people whose last message was sent by you, starts with 'Hello', and is older than 2 days"
+    )
     args = parser.parse_args()
 
-    if args.applicationPortal == "instahyre":
+    if args.pa:
+        linkedin_pa_main()
+    elif args.applicationPortal == "instahyre":
         from instahyre.instahyre_apply import apply_to_jobs
         apply_to_jobs()
     else:

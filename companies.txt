@@ -1,11 +1,1 @@
-Mphasis,10
-Zensurance,9
-L&T Infotech,8
-Myntra,7
-Flipkart,6
-Swiggy,5
-Zomato,4
-Ola,3
-Uber,8
-Paytm,10
-
+Zensurance,1

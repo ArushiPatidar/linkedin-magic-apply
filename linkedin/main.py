@@ -3,6 +3,7 @@ from linkedin.browser import driver
 from linkedin.auth import login
 from linkedin.utils import random_delay, dismiss_any_modal, scroll_to_bottom
 from linkedin.connect import send_connection_requests_on_page, go_to_next_page
+from linkedin.ping_again import ping_again
 import csv
 import os
 from datetime import datetime
@@ -93,3 +94,17 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+def pa_main():
+    """Login, then run the Ping Again flow."""
+    try:
+        login()
+        ping_again()
+    except KeyboardInterrupt:
+        print("\n[!] Interrupted by user.", flush=True)
+    except Exception as e:
+        print(f"\n[!] Unexpected error: {e}", flush=True)
+    finally:
+        input("Press ENTER to close the browser …")
+        driver.quit()
